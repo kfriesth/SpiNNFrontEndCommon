@@ -136,7 +136,9 @@ void flush_events(void) {
             }
 #endif // LOG_LEVEL >= LOG_DEBUG
 
-            spin1_send_sdp_msg(&g_event_message, 1);
+            while (!spin1_send_sdp_msg(&g_event_message, 30)) {
+                spin1_delay_us(1);
+            }
             packets_sent++;
         }
 
@@ -166,6 +168,10 @@ void record_provenance_data(void){
              "payload and %d lost packets with payload.",
              provenance_data.number_of_over_flows_none_payload,
              provenance_data.number_of_over_flows_payload);
+
+    log_info("%d with-payload-overflows, %d without-payload-overflows",
+             circular_buffer_get_n_buffer_overflows(with_payload_buffer),
+             circular_buffer_get_n_buffer_overflows(without_payload_buffer));
 }
 
 // Callbacks

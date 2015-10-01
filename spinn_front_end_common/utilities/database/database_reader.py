@@ -1,4 +1,5 @@
 import sqlite3 as sqlite
+from collections import OrderedDict
 
 
 class DatabaseReader(object):
@@ -31,12 +32,13 @@ class DatabaseReader(object):
         :return: dictionary of atom ids indexed by event key
         :rtype: dict
         """
-        event_id_to_atom_id_mapping = dict()
+        event_id_to_atom_id_mapping = OrderedDict()
         for row in self._cursor.execute(
             "SELECT n.atom_id as a_id, n.event_id as event"
             " FROM event_to_atom_mapping as n"
             " JOIN Partitionable_vertices as p ON n.vertex_id = p.vertex_id"
-                " WHERE p.vertex_label=\"{}\"".format(label)):
+                " WHERE p.vertex_label=\"{}\""
+                " ORDER BY a_id".format(label)):
             event_id_to_atom_id_mapping[row["event"]] = row["a_id"]
         return event_id_to_atom_id_mapping
 
@@ -100,6 +102,21 @@ class DatabaseReader(object):
             " WHERE partitionable.vertex_label=\"{}\"".format(label))
         row = self._cursor.fetchone()
         return row["board_address"], row["port"]
+
+    def get_placements(self, label):
+        rows = self._cursor.execute(
+            "SELECT placement.chip_x as x, placement.chip_y as y, "
+            " placement.chip_p as p,"
+            " subvertex.lo_atom as lo_atom, subvertex.hi_atom as hi_atom"
+            " FROM Placements as placement"
+            " JOIN graph_mapper_vertex as subvertex"
+            " ON placement.vertex_id == subvertex.partitioned_vertex_id"
+            " JOIN Partitionable_vertices as vertices"
+            " ON vertices.vertex_id == subvertex.partitionable_vertex_id"
+            " WHERE vertices.vertex_label == \"{}\""
+            " ORDER BY lo_atom".format(label))
+        for row in rows:
+            yield row["x"], row["y"], row["p"], row["lo_atom"], row["hi_atom"]
 
     def get_n_atoms(self, label):
         """ Get the number of atoms in a given vertex
