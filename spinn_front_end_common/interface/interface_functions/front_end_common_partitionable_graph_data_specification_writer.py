@@ -24,7 +24,7 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriter(object):
         # vertex
         executable_targets = ExecutableTargets()
         dsg_targets = dict()
-
+        lst=dict()
         # create a progress bar for end users
         progress_bar = ProgressBar(len(list(placements.placements)),
                                    "Generating data specifications")
@@ -35,15 +35,20 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriter(object):
             # if the vertex can generate a DSG, call it
             if isinstance(associated_vertex, AbstractDataSpecableVertex):
 
+                strkey=str(placement.x)+str(placement.y)+str(placement.p)
                 ip_tags = tags.get_ip_tags_for_vertex(
                     placement.subvertex)
                 reverse_ip_tags = tags.get_reverse_ip_tags_for_vertex(
                     placement.subvertex)
-                file_path = associated_vertex.generate_data_spec(
+
+                [file_path, packet_list] = associated_vertex.generate_data_spec(
                     placement.subvertex, placement, partitioned_graph,
                     partitionable_graph, routing_infos, hostname, graph_mapper,
                     report_default_directory, ip_tags, reverse_ip_tags,
                     write_text_specs, app_data_runtime_folder)
+
+
+                lst[strkey]=packet_list
 
                 # link dsg file to subvertex
                 dsg_targets[placement.x, placement.y, placement.p,
@@ -69,4 +74,5 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriter(object):
         progress_bar.end()
 
         return {'executable_targets': executable_targets,
-                'dsg_targets': dsg_targets}
+                'dsg_targets': dsg_targets,
+                'lst':lst}
