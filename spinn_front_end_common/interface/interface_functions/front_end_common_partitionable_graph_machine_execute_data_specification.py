@@ -54,12 +54,13 @@ class FrontEndCommonPartitionableGraphMachineExecuteDataSpecification(object):
 
     @staticmethod
     def send(transceiver, core_pk_list_creator):
+        time.sleep(0.1)
         from spinnman.messages.sdp.sdp_message import SDPMessage
         pkt_lst_creator=core_pk_list_creator
         pk_list=core_pk_list_creator.stored_packets
         for i in pk_list:
             transceiver.send_sdp_message(SDPMessage(pkt_lst_creator.header, i.bytestring))
-            time.sleep(0.015)
+            time.sleep(0.01)
             #time.sleep(throttling_ms)
 
 
@@ -109,19 +110,19 @@ class FrontEndCommonPartitionableGraphMachineExecuteDataSpecification(object):
                 x, y, p = placement.x, placement.y, placement.p
                 k_gen=str(x)+str(y)+str(p)
                 pack_list=lst[k_gen];
-                p = Process(target=self.send, args=(transceiver, pack_list, ))
-                processes.append(p)
-                #self.send(transceiver, pack_list)
-
+                #p = Process(target=self.send, args=(transceiver, pack_list, ))
+                #processes.append(p)
+                self.send(transceiver, pack_list)
+        '''
         for process in processes:
             process.start()
         for process in processes:
             process.join()
             progress_bar.update()
-
+        '''
         progress_bar.end()
 
-        time.sleep(2)
+        time.sleep(20)
 
         transceiver.stop_application(dse_app_id)
         logger.info("On-chip data spec executor completed")
