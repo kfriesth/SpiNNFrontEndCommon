@@ -60,7 +60,7 @@ class FrontEndCommonPartitionableGraphMachineExecuteDataSpecification(object):
         pk_list=core_pk_list_creator.stored_packets
         for i in pk_list:
             transceiver.send_sdp_message(SDPMessage(pkt_lst_creator.header, i.bytestring))
-            time.sleep(0.01)
+            time.sleep(0.004)
             #time.sleep(throttling_ms)
 
 
@@ -122,7 +122,7 @@ class FrontEndCommonPartitionableGraphMachineExecuteDataSpecification(object):
         '''
         progress_bar.end()
 
-        time.sleep(20)
+        #time.sleep(20)
 
         transceiver.stop_application(dse_app_id)
         logger.info("On-chip data spec executor completed")
