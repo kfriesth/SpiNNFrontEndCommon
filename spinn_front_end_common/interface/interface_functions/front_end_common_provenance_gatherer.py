@@ -46,8 +46,13 @@ class FrontEndCommonProvenanceGatherer(object):
                         "Provanence_data_for_{}_{}_{}_{}.xml".format(
                             placement.subvertex.label,
                             placement.x, placement.y, placement.p))
-                    placement.subvertex.write_provenance_data_in_xml(
-                        core_file_path, transceiver, placement)
+                    try:
+                        placement.subvertex.write_provenance_data_in_xml(
+                            core_file_path, transceiver, placement)
+                    except:
+                        import logging
+                        logging.getLogger().info("died at"+str(placement.x)+str(placement.y)+str(placement.p))
+                        continue
                 progress.update()
             progress.end()
 

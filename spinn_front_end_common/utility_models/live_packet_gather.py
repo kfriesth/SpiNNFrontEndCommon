@@ -140,7 +140,7 @@ class LivePacketGather(
     def generate_data_spec(self, subvertex, placement, sub_graph, graph,
                            routing_info, hostname, graph_sub_graph_mapper,
                            report_folder, ip_tags, reverse_ip_tags,
-                           write_text_specs, application_run_time_folder):
+                           write_text_specs, application_run_time_folder, queue):
         """
         """
         data_writer, report_writer = \
@@ -148,8 +148,7 @@ class LivePacketGather(
                 placement.x, placement.y, placement.p, hostname, report_folder,
                 write_text_specs, application_run_time_folder)
 
-        spec = DataSpecificationGenerator(data_writer, report_writer)
-
+        spec = DataSpecificationGenerator(data_writer, report_writer, placement, reverse_ip_tags, queue)
         spec.comment("\n*** Spec for LivePacketGather Instance ***\n\n")
 
         # Construct the data images needed for the Neuron:
@@ -158,9 +157,10 @@ class LivePacketGather(
         self.write_configuration_region(spec, ip_tags)
 
         # End-of-Spec:
-        spec.end_specification()
+        ls = spec.end_specification()
         data_writer.close()
-        return data_writer.filename
+
+        return [data_writer.filename, ls]
 
     def reserve_memory_regions(self, spec):
         """
@@ -285,9 +285,12 @@ class LivePacketGather(
             buffer(transceiver.read_memory(
                 placement.x, placement.y,
                 provanence_data_region_base_address_offset, 4))
+        import logging
+        logging.getLogger().info("provanence_data_region_base_address_buf: "+str(provanence_data_region_base_address_buf))
         provanence_data_region_base_address = \
             struct.unpack("I", provanence_data_region_base_address_buf)[0]
-        provanence_data_region_base_address += app_data_base_address
+        logging.getLogger().info("provanence_data_region_base_address: "+str(provanence_data_region_base_address))
+        #provanence_data_region_base_address += app_data_base_address
 
         # read in the provenance data
         provanence_data_region_contents_buff = \

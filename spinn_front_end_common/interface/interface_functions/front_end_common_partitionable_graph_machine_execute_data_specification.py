@@ -44,6 +44,7 @@ class FrontEndCommonPartitionableGraphMachineExecuteDataSpecification(object):
         :param machine:
         :return:
         """
+
         data = self.spinnaker_based_data_specification_execution(
             hostname, placements, graph_mapper, report_states,
             runtime_application_data_folder, machine, board_version,
@@ -79,6 +80,7 @@ class FrontEndCommonPartitionableGraphMachineExecuteDataSpecification(object):
         :param machine:
         :return:
         """
+        '''
         mem_map_report = report_states.write_memory_map_report
 
         # check which cores are in use
@@ -87,6 +89,8 @@ class FrontEndCommonPartitionableGraphMachineExecuteDataSpecification(object):
         for placement in placements.placements:
             core_subset.add_processor(placement.x, placement.y, placement.p)
             number_of_cores_used += 1
+
+        from data_specification.sender_pool import SenderPool
 
         # read DSE exec name
         executable_targets = {
@@ -101,7 +105,8 @@ class FrontEndCommonPartitionableGraphMachineExecuteDataSpecification(object):
         progress_bar = ProgressBar(len(list(placements.placements)),
                                    "Loading data specifications on chip")
 
-        processes=list()
+        #processes=list()
+        sp=SenderPool(2, transceiver)
         for placement in placements.placements:
             associated_vertex = graph_mapper.get_vertex_from_subvertex(
                 placement.subvertex)
@@ -112,21 +117,19 @@ class FrontEndCommonPartitionableGraphMachineExecuteDataSpecification(object):
                 pack_list=lst[k_gen];
                 #p = Process(target=self.send, args=(transceiver, pack_list, ))
                 #processes.append(p)
-                self.send(transceiver, pack_list)
-        '''
-        for process in processes:
-            process.start()
-        for process in processes:
-            process.join()
-            progress_bar.update()
-        '''
+                #self.send(transceiver, pack_list)
+                sp.add(pack_list)
+
+        sp.stop()
+
+
         progress_bar.end()
 
-        #time.sleep(20)
-
+        #time.sleep(100)
         transceiver.stop_application(dse_app_id)
         logger.info("On-chip data spec executor completed")
-
+        return None
+        '''
         return {"LoadedApplicationDataToken": True,
                 "DSEOnHost": False,
                 "DSEOnChip": True}
