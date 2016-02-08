@@ -112,10 +112,10 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
 
             progress_bar.update()
 
+        import time
         time.sleep(2)
         sp.stop()
         logger.info("ended specp")
-        import time
         time.sleep(100)
 
         # finish the progress bar
