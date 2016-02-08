@@ -140,7 +140,7 @@ class LivePacketGather(
     def generate_data_spec(self, subvertex, placement, sub_graph, graph,
                            routing_info, hostname, graph_sub_graph_mapper,
                            report_folder, ip_tags, reverse_ip_tags,
-                           write_text_specs, application_run_time_folder):
+                           write_text_specs, application_run_time_folder, on_host_flag=True, queue=None):
         """
         """
         data_writer, report_writer = \
@@ -148,7 +148,10 @@ class LivePacketGather(
                 placement.x, placement.y, placement.p, hostname, report_folder,
                 write_text_specs, application_run_time_folder)
 
-        spec = DataSpecificationGenerator(data_writer, report_writer)
+        if on_host_flag is True:
+            spec = DataSpecificationGenerator(data_writer, report_writer, on_host_flag=on_host_flag)
+        else:
+            spec = DataSpecificationGenerator(data_writer, report_writer, placement=placement, reverse_iptags=reverse_ip_tags, queue=queue, on_host_flag=on_host_flag)
 
         spec.comment("\n*** Spec for LivePacketGather Instance ***\n\n")
 
