@@ -78,6 +78,9 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
             if isinstance(associated_vertex, AbstractDataSpecableVertex):
 
                 strkey=str(placement.x)+str(placement.y)+str(placement.p)
+
+                if strkey =="0010":
+                    pass
                 ip_tags = tags.get_ip_tags_for_vertex(
                     placement.subvertex)
                 reverse_ip_tags = tags.get_reverse_ip_tags_for_vertex(
@@ -111,13 +114,13 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
 
         sp.stop()
         import time
-        time.sleep(3)
+        time.sleep(100)
 
         # finish the progress bar
         progress_bar.end()
         logger.info("ended spec")
         #time.sleep(30)
-        transceiver.stop_application(31)
+        #transceiver.stop_application(31)
         '''
         import pickle
         serialized_brunnell = open('serialized_brunnell', 'wb')

@@ -221,7 +221,7 @@ class ReverseIpTagMultiCastSource(
         return subvertex.generate_data_spec(
             subvertex, placement, sub_graph, graph, routing_info,
             hostname, graph_mapper, report_folder, ip_tags, reverse_ip_tags,
-            write_text_specs, application_run_time_folder, on_host_flag=True, queue=None)
+            write_text_specs, application_run_time_folder, on_host_flag=on_host_flag, queue=queue)
 
     def create_subvertex(self, vertex_slice, resources_required, label=None,
                          constraints=None):
