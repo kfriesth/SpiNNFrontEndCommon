@@ -89,7 +89,7 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
                     placement.subvertex, placement, partitioned_graph,
                     partitionable_graph, routing_infos, hostname, graph_mapper,
                     report_default_directory, ip_tags, reverse_ip_tags,
-                    write_text_specs, app_data_runtime_folder,on_host_flag=False,queue=queue)
+                    write_text_specs, app_data_runtime_folder, on_host_flag=False, queue=queue)
 
 
                 # link dsg file to subvertex
@@ -112,13 +112,14 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
 
             progress_bar.update()
 
+        time.sleep(2)
         sp.stop()
+        logger.info("ended specp")
         import time
         time.sleep(100)
 
         # finish the progress bar
         progress_bar.end()
-        logger.info("ended spec")
         #time.sleep(30)
         #transceiver.stop_application(31)
         '''
