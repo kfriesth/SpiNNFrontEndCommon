@@ -64,10 +64,10 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
         executable_targets = ExecutableTargets()
         dsg_targets = dict()
         lst=dict()
-        logger.info("test")
+        #logger.info("test")
         # create a progress bar for end users
         progress_bar = ProgressBar(len(list(placements.placements)),
-                                   "Generating data specifications")
+                                   "Generating and Asyncronously Sending data specifications")
         sp=SenderPool(1, transceiver)
         queue=sp.get_queue()
         for placement in placements.placements:
@@ -85,16 +85,17 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
                 try:
                     if strkey=="003": #or strkey=="003"
                         pass
-                    [file_path, packet_list] = associated_vertex.generate_data_spec(
+                    file_path = associated_vertex.generate_data_spec(
                         placement.subvertex, placement, partitioned_graph,
                         partitionable_graph, routing_infos, hostname, graph_mapper,
                         report_default_directory, ip_tags, reverse_ip_tags,
                         write_text_specs, app_data_runtime_folder, send_async=True, queue=queue)
                 except:
                     logger.info(strkey)
+                    #logger.info(e)
                     break
 
-                lst[strkey]=packet_list
+                #lst[strkey]=packet_list
 
                 # link dsg file to subvertex
                 dsg_targets[placement.x, placement.y, placement.p,
