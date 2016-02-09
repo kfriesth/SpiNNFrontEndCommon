@@ -10,7 +10,7 @@ from pacman.utilities.utility_objs.progress_bar import ProgressBar
 # spinnman imports
 from spinnman.model.core_subsets import CoreSubsets
 from spinnman.model.cpu_state import CPUState
-from multiprocessing import Process
+
 # front end common imports
 from spinn_front_end_common.abstract_models.\
     abstract_data_specable_vertex import \
@@ -33,7 +33,7 @@ class FrontEndCommonPartitionableGraphMachineExecuteDataSpecification(object):
     def __call__(
             self, hostname, placements, graph_mapper, report_default_directory,
             report_states, runtime_application_data_folder, machine,
-            board_version, dsg_targets, transceiver, dse_app_id, app_id, lst):
+            board_version, dsg_targets, transceiver, dse_app_id, app_id):
         """
 
         :param hostname:
@@ -44,32 +44,19 @@ class FrontEndCommonPartitionableGraphMachineExecuteDataSpecification(object):
         :param machine:
         :return:
         """
-
         data = self.spinnaker_based_data_specification_execution(
             hostname, placements, graph_mapper, report_states,
             runtime_application_data_folder, machine, board_version,
             report_default_directory, dsg_targets, transceiver,
-            dse_app_id, app_id,lst)
+            dse_app_id, app_id)
 
         return data
-
-    @staticmethod
-    def send(transceiver, core_pk_list_creator):
-        time.sleep(0.1)
-        from spinnman.messages.sdp.sdp_message import SDPMessage
-        pkt_lst_creator=core_pk_list_creator
-        pk_list=core_pk_list_creator.stored_packets
-        for i in pk_list:
-            transceiver.send_sdp_message(SDPMessage(pkt_lst_creator.header, i.bytestring))
-            time.sleep(0.004)
-            #time.sleep(throttling_ms)
-
 
     def spinnaker_based_data_specification_execution(
             self, hostname, placements, graph_mapper, report_states,
             application_data_runtime_folder, machine, board_version,
             report_default_directory, dsg_targets, transceiver,
-            dse_app_id, app_id, lst):
+            dse_app_id, app_id):
         """
 
         :param hostname:
@@ -80,7 +67,6 @@ class FrontEndCommonPartitionableGraphMachineExecuteDataSpecification(object):
         :param machine:
         :return:
         """
-        '''
         mem_map_report = report_states.write_memory_map_report
 
         # check which cores are in use
@@ -90,46 +76,85 @@ class FrontEndCommonPartitionableGraphMachineExecuteDataSpecification(object):
             core_subset.add_processor(placement.x, placement.y, placement.p)
             number_of_cores_used += 1
 
-        from data_specification.sender_pool import SenderPool
-
         # read DSE exec name
         executable_targets = {
-            os.path.dirname(spec_sender.__file__) +
-            '/data_specification_executor.aplx': core_subset}
-
-        self._load_executable_images(
-           transceiver, executable_targets, dse_app_id,
-           app_data_folder=application_data_runtime_folder)
+            os.path.dirname(spec_sender.__file__) + '/no_async'+
+            '/data_specification_executor_no_async.aplx': core_subset}
 
         # create a progress bar for end users
         progress_bar = ProgressBar(len(list(placements.placements)),
                                    "Loading data specifications on chip")
 
-        #processes=list()
-        sp=SenderPool(2, transceiver)
         for placement in placements.placements:
             associated_vertex = graph_mapper.get_vertex_from_subvertex(
                 placement.subvertex)
+
             # if the vertex can generate a DSG, call it
             if isinstance(associated_vertex, AbstractDataSpecableVertex):
+
                 x, y, p = placement.x, placement.y, placement.p
-                k_gen=str(x)+str(y)+str(p)
-                pack_list=lst[k_gen];
-                #p = Process(target=self.send, args=(transceiver, pack_list, ))
-                #processes.append(p)
-                #self.send(transceiver, pack_list)
-                sp.add(pack_list)
+                label = associated_vertex.label
 
-        sp.stop()
+                dse_data_struct_addr = transceiver.malloc_sdram(
+                    x, y, constants.DSE_DATA_STRUCT_SIZE, dse_app_id)
 
+                data_spec_file_path = dsg_targets[x, y, p, label]
+                data_spec_file_size = os.path.getsize(data_spec_file_path)
 
+                application_data_file_reader = FileDataReader(
+                    data_spec_file_path)
+
+                base_address = transceiver.malloc_sdram(
+                    x, y, data_spec_file_size, dse_app_id)
+
+                dse_data_struct_data = struct.pack(
+                        "<IIII",
+                        base_address,
+                        data_spec_file_size,
+                        app_id,
+                        mem_map_report)
+
+                transceiver.write_memory(
+                    x, y, dse_data_struct_addr, dse_data_struct_data,
+                    len(dse_data_struct_data))
+
+                transceiver.write_memory(
+                    x, y, base_address, application_data_file_reader,
+                    data_spec_file_size)
+
+                # data spec file is written at specific address (base_address)
+                # this is encapsulated in a structure with four fields:
+                # 1 - data specification base address
+                # 2 - data specification file size
+                # 3 - future application ID
+                # 4 - store data for memory map report (True / False)
+                # If the memory map report is going to be produced, the
+                # address of the structure is returned in user1
+                user_0_address = transceiver.\
+                    get_user_0_register_address_from_core(x, y, p)
+
+                transceiver.write_memory(
+                    x, y, user_0_address, dse_data_struct_addr, 4)
+
+                progress_bar.update()
         progress_bar.end()
 
-        #time.sleep(100)
+        self._load_executable_images(
+            transceiver, executable_targets, dse_app_id,
+            app_data_folder=application_data_runtime_folder)
+
+        processors_exited = transceiver.get_core_state_count(
+            dse_app_id, CPUState.FINISHED)
+        while processors_exited < number_of_cores_used:
+            logger.info("Data spec executor on chip not completed, waiting "
+                        "1 sec. for it to complete")
+            time.sleep(1)
+            processors_exited = transceiver.get_core_state_count(
+                dse_app_id, CPUState.FINISHED)
+
         transceiver.stop_application(dse_app_id)
         logger.info("On-chip data spec executor completed")
-        return None
-        '''
+
         return {"LoadedApplicationDataToken": True,
                 "DSEOnHost": False,
                 "DSEOnChip": True}

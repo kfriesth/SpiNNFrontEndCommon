@@ -398,14 +398,14 @@ class ReverseIPTagMulticastSourcePartitionedVertex(
     def generate_data_spec(
             self, subvertex, placement, sub_graph, graph, routing_info,
             hostname, graph_subgraph_mapper, report_folder, ip_tags,
-            reverse_ip_tags, write_text_specs, application_run_time_folder, queue):
+            reverse_ip_tags, write_text_specs, application_run_time_folder, send_async=False, queue=None):
 
         # Create new DataSpec for this processor:
         data_writer, report_writer = \
             self.get_data_spec_file_writers(
                 placement.x, placement.y, placement.p, hostname, report_folder,
                 write_text_specs, application_run_time_folder)
-        spec = DataSpecificationGenerator(data_writer, report_writer, placement, reverse_ip_tags, queue=queue)
+        spec = DataSpecificationGenerator(data_writer, report_writer, placement, reverse_ip_tags, send_async, queue)
 
         self._update_virtual_key(routing_info, sub_graph)
         self._fill_send_buffer()
@@ -428,7 +428,7 @@ class ReverseIPTagMulticastSourcePartitionedVertex(
         packet_list=spec.end_specification()
         data_writer.close()
 
-        return [data_writer.filename, packet_list]
+        return data_writer.filename
 
     def get_binary_file_name(self):
         return "reverse_iptag_multicast_source.aplx"

@@ -132,7 +132,7 @@ class CommandSender(AbstractProvidesOutgoingEdgeConstraints,
     def generate_data_spec(
             self, subvertex, placement, sub_graph, graph, routing_info,
             hostname, graph_mapper, report_folder, ip_tags, reverse_ip_tags,
-            write_text_specs, application_run_time_folder):
+            write_text_specs, application_run_time_folder, send_async=False, queue=None):
         """
         :param subvertex:
         :param placement:
@@ -154,7 +154,7 @@ class CommandSender(AbstractProvidesOutgoingEdgeConstraints,
                 placement.x, placement.y, placement.p, hostname, report_folder,
                 write_text_specs, application_run_time_folder)
 
-        spec = DataSpecificationGenerator(data_writer, report_writer)
+        spec = DataSpecificationGenerator(data_writer, report_writer, placement, reverse_ip_tags, send_async, queue)
 
         # reserve region - add a word for the region size
         n_command_bytes = self._get_n_command_bytes()
