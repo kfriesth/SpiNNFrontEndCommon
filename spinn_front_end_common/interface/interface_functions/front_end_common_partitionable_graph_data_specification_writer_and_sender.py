@@ -118,9 +118,8 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
             progress_bar.update()
 
 
-        time.sleep(2)
         sp.stop()
-        # finish the progress bar
+        time.sleep(6)
         progress_bar.end()
         logger.info("ended spec")
         transceiver.stop_application(31)
