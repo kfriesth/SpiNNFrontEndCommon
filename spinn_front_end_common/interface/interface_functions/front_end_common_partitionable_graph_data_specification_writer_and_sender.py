@@ -117,12 +117,22 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
 
             progress_bar.update()
 
-
         sp.stop()
-        time.sleep(6)
+
+        processors_exited = transceiver.get_core_state_count(
+            31, CPUState.FINISHED)
+        while processors_exited < number_of_cores_used:
+            logger.info("Data spec executor on chip not completed, waiting for it to complete")
+            time.sleep(1)
+            processors_exited = transceiver.get_core_state_count(
+                31, CPUState.FINISHED)
+
         progress_bar.end()
+
         logger.info("ended spec")
+
         transceiver.stop_application(31)
+
         '''
         import pickle
         serialized_brunnell = open('serialized_brunnell', 'wb')
