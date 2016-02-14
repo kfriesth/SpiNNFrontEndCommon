@@ -69,7 +69,7 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriter(object):
                         placement.subvertex, placement, partitioned_graph,
                         partitionable_graph, routing_infos, hostname, graph_mapper,
                         report_default_directory, ip_tags, reverse_ip_tags,
-                        write_text_specs, app_data_runtime_folder, send_async=False)
+                        write_text_specs, app_data_runtime_folder)
                 except:
                     logger.info(strkey)
                     break

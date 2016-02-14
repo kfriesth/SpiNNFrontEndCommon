@@ -48,8 +48,11 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
         number_of_cores_used = 0
         core_subset = CoreSubsets()
         for placement in placements.placements:
-            core_subset.add_processor(placement.x, placement.y, placement.p)
-            number_of_cores_used += 1
+            associated_vertex = graph_mapper.get_vertex_from_subvertex(
+                placement.subvertex)
+            if isinstance(associated_vertex, AbstractDataSpecableVertex):
+                core_subset.add_processor(placement.x, placement.y, placement.p)
+                number_of_cores_used += 1
 
         from data_specification.sender_pool import SenderPool
 
@@ -68,8 +71,11 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
         # create a progress bar for end users
         progress_bar = ProgressBar(len(list(placements.placements)),
                                    "Generating and Asyncronously Sending data specifications")
-        sp=SenderPool(1, transceiver)
-        queue=sp.get_queue()
+        #transceiver.set_reinjection_router_timeout(0xF, 0xF)
+        #sp=SenderPool(1, transceiver)
+        #queue=sp.get_queue()
+        from data_specification.communicator_pool import CommunicatorsPool
+        cp=CommunicatorsPool(5, transceiver)
         for placement in placements.placements:
             associated_vertex = graph_mapper.get_vertex_from_subvertex(
                 placement.subvertex)
@@ -83,16 +89,22 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
                 reverse_ip_tags = tags.get_reverse_ip_tags_for_vertex(
                     placement.subvertex)
                 try:
-                    if strkey=="003": #or strkey=="003"
+                    if strkey == "003":
                         pass
+
+                    if reverse_ip_tags is None:
+                        r_iptag=0
+                    elif reverse_ip_tags is list:
+                        r_iptag=reverse_ip_tags[0]
+                    new_queue = cp.add_communicate_packet(placement.x, placement.y, placement.p, r_iptag)
                     file_path = associated_vertex.generate_data_spec(
                         placement.subvertex, placement, partitioned_graph,
                         partitionable_graph, routing_infos, hostname, graph_mapper,
                         report_default_directory, ip_tags, reverse_ip_tags,
-                        write_text_specs, app_data_runtime_folder, send_async=True, queue=queue)
+                        write_text_specs, app_data_runtime_folder, queue=new_queue)
                 except:
-                    logger.info(strkey)
-                    #logger.info(e)
+                    cp.emergency_stop()
+                    logger.error("Something bad happened during the generation and sending of core x: "+str(placement.x)+" y: "+str(placement.y)+" p:"+str(placement.p) )
                     break
 
                 #lst[strkey]=packet_list
@@ -117,7 +129,10 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
 
             progress_bar.update()
 
-        sp.stop()
+        #sp.stop()
+        cp.stop()
+        logger.info("going to sleep")
+        #time.sleep(10)
 
         processors_exited = transceiver.get_core_state_count(
             31, CPUState.FINISHED)
