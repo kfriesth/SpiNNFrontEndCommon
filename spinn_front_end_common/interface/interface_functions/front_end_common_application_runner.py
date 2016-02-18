@@ -153,11 +153,14 @@ class FrontEndCommonApplicationRunner(object):
             else:
                 unsuccessful_cores = helpful_functions.get_cores_not_in_state(
                     all_core_subsets, CPUState.RUNNING, txrx)
-                break_down = helpful_functions.get_core_status_string(
-                    unsuccessful_cores)
-                raise exceptions.ExecutableFailedToStartException(
-                    "Only {} of {} processors started:{}"
-                    .format(processors_running, total_processors, break_down))
+
+                # Last chance to get out of error state
+                if len(unsuccessful_cores) > 0:
+                    break_down = helpful_functions.get_core_status_string(
+                        unsuccessful_cores)
+                    raise exceptions.ExecutableFailedToStartException(
+                        "Only {} of {} processors started:{}".format(
+                            processors_running, total_processors, break_down))
 
     def wait_for_execution_to_complete(
             self, executable_targets, app_id, runtime, time_scaling,

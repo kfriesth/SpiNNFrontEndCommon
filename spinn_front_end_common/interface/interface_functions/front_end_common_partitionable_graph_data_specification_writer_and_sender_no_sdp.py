@@ -24,8 +24,10 @@ from spinn_front_end_common.abstract_models.\
     AbstractDataSpecableVertex
 from spinn_front_end_common.utilities import constants
 from spinn_front_end_common.utilities import exceptions
+from multiprocessing import Queue
 import os
 import time
+import struct
 import logging
 logger=logging.getLogger(__name__)
 
@@ -43,8 +45,7 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
         :return:
         """
 
-        # iterate though subvertices and call generate_data_spec for each
-        # vertex
+        # check which cores are in use
         number_of_cores_used = 0
         core_subset = CoreSubsets()
         for placement in placements.placements:
@@ -52,30 +53,19 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
                 placement.subvertex)
             if isinstance(associated_vertex, AbstractDataSpecableVertex):
                 core_subset.add_processor(placement.x, placement.y, placement.p)
-                number_of_cores_used += 1
-
-        from data_specification.sender_pool import SenderPool
 
         # read DSE exec name
         executable_targets = {
-            os.path.dirname(spec_sender.__file__) +
-            '/data_specification_executor.aplx': core_subset}
+            os.path.dirname(spec_sender.__file__) + '/no_async'+
+            '/data_specification_executor_no_async.aplx': core_subset}
 
-        self._load_executable_images(transceiver, executable_targets, 31)
-
-
-        executable_targets = ExecutableTargets()
+        executable_targets=ExecutableTargets()
+        q=Queue()
+        p=Process(target=self.send_data_async, args=(q, transceiver, 31, 0))
+        p.start()
         dsg_targets = dict()
-        lst=dict()
-        #logger.info("test")
-        # create a progress bar for end users
         progress_bar = ProgressBar(len(list(placements.placements)),
-                                   "Generating and Asyncronously Sending data specifications")
-        #transceiver.set_reinjection_router_timeout(0xF, 0xF)
-        #sp=SenderPool(1, transceiver)
-        #queue=sp.get_queue()
-        from data_specification.communicator_pool import CommunicatorsPool
-        cp=CommunicatorsPool(1, transceiver)
+                                   "Generating Asyncronously Sending data specifications via SCP")
 
         for placement in placements.placements:
             associated_vertex = graph_mapper.get_vertex_from_subvertex(
@@ -84,35 +74,25 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
             # if the vertex can generate a DSG, call it
             if isinstance(associated_vertex, AbstractDataSpecableVertex):
 
-                #strkey=str(placement.x)+str(placement.y)+str(placement.p)
                 ip_tags = tags.get_ip_tags_for_vertex(
                     placement.subvertex)
                 reverse_ip_tags = tags.get_reverse_ip_tags_for_vertex(
                     placement.subvertex)
                 try:
-                    #if strkey == "003":
-                    #    pass
-                    if reverse_ip_tags is None:
-                        r_iptag=0
-                    elif reverse_ip_tags is list:
-                        r_iptag=reverse_ip_tags[0]
-                    new_queue = cp.add_communicate_packet(placement.x, placement.y, placement.p, r_iptag)
                     file_path = associated_vertex.generate_data_spec(
                         placement.subvertex, placement, partitioned_graph,
                         partitionable_graph, routing_infos, hostname, graph_mapper,
                         report_default_directory, ip_tags, reverse_ip_tags,
-                        write_text_specs, app_data_runtime_folder, queue=new_queue)
+                        write_text_specs, app_data_runtime_folder)
                 except:
-                    cp.emergency_stop()
                     logger.error("Something bad happened during the generation and sending of core x: "+str(placement.x)+" y: "+str(placement.y)+" p:"+str(placement.p) )
                     break
-
-                #lst[strkey]=packet_list
 
                 # link dsg file to subvertex
                 dsg_targets[placement.x, placement.y, placement.p,
                             associated_vertex.label] = file_path
 
+                q.put([file_path, placement.x, placement.y, placement.p, 30])
                 # Get name of binary from vertex
                 binary_name = associated_vertex.get_binary_file_name()
 
@@ -124,15 +104,15 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
 
                 if not executable_targets.has_binary(binary_path):
                     executable_targets.add_binary(binary_path)
+
                 executable_targets.add_processor(
                     binary_path, placement.x, placement.y, placement.p)
 
             progress_bar.update()
 
-        #sp.stop()
-        cp.stop()
-        #logger.info("going to sleep")
-        #time.sleep(10)
+        q.put(["stop"])
+        p.join()
+
 
         processors_exited = transceiver.get_core_state_count(
             31, CPUState.FINISHED)
@@ -141,25 +121,84 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
             time.sleep(1)
             processors_exited = transceiver.get_core_state_count(
                 31, CPUState.FINISHED)
-
         progress_bar.end()
-
         logger.info("ended spec")
-
         transceiver.stop_application(31)
 
-        '''
-        import pickle
-        serialized_brunnell = open('serialized_brunnell', 'wb')
-        pickle.dump(lst, serialized_brunnell)
-        time.sleep(100)
-        serialized_brunnell.close()
-        '''
         return {'executable_targets': executable_targets,
                 'dsg_targets': dsg_targets,
                 "LoadedApplicationDataToken": True,
                 "DSEOnHost": False,
                 "DSEOnChip": True}
+
+    @staticmethod
+    def send_data_async(queue, transceiver, dse_app_id, mem_map_report):
+        ctr=0
+        while True:
+            value=queue.get() # [filename, x, y, p, app_id]
+            ctr += 1
+            data_spec_file_path=value[0]
+            if data_spec_file_path == "stop":
+                return
+            x=value[1]
+            y=value[2]
+            p=value[3]
+            app_id=value[4]
+            cs=CoreSubsets()
+            cs.add_processor(x,y,p)
+            dse_data_struct_addr = transceiver.malloc_sdram(
+                        x, y, constants.DSE_DATA_STRUCT_SIZE, dse_app_id)
+
+            data_spec_file_size = os.path.getsize(data_spec_file_path)
+
+            application_data_file_reader = FileDataReader(
+                data_spec_file_path)
+
+            base_address = transceiver.malloc_sdram(
+                x, y, data_spec_file_size, dse_app_id)
+
+            dse_data_struct_data = struct.pack(
+                    "<IIII",
+                    base_address,
+                    data_spec_file_size,
+                    app_id,
+                    mem_map_report)
+
+            transceiver.write_memory(
+                x, y, dse_data_struct_addr, dse_data_struct_data,
+                len(dse_data_struct_data))
+
+            transceiver.write_memory(
+                x, y, base_address, application_data_file_reader,
+                data_spec_file_size)
+
+            # data spec file is written at specific address (base_address)
+            # this is encapsulated in a structure with four fields:
+            # 1 - data specification base address
+            # 2 - data specification file size
+            # 3 - future application ID
+            # 4 - store data for memory map report (True / False)
+            # If the memory map report is going to be produced, the
+            # address of the structure is returned in user1
+            user_0_address = transceiver.\
+                get_user_0_register_address_from_core(x, y, p)
+
+            transceiver.write_memory(
+                x, y, user_0_address, dse_data_struct_addr, 4)
+            statinfo = os.stat( os.path.dirname(spec_sender.__file__) + '/no_async'+'/data_specification_executor_no_async.aplx')
+            size = statinfo.st_size
+            file_reader = FileDataReader(os.path.dirname(spec_sender.__file__) + '/no_async'+'/data_specification_executor_no_async.aplx')
+            transceiver.execute_flood(cs, file_reader, 31, size)
+            processors_exited = transceiver.get_core_state_count(
+            31, CPUState.FINISHED)
+
+            while processors_exited < ctr:
+                #logger.info("Data spec executor on chip not completed, waiting for it to complete")
+                time.sleep(0.1)
+                processors_exited = transceiver.get_core_state_count(
+                    31, CPUState.FINISHED)
+
+
 
 
     def _load_executable_images(self, transceiver, executable_targets, app_id):
