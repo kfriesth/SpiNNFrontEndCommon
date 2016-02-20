@@ -55,7 +55,7 @@ class AbstractDataSpecableVertex(object):
     def generate_data_spec(
             self, subvertex, placement, sub_graph, graph, routing_info,
             hostname, graph_subgraph_mapper, report_folder, ip_tags,
-            reverse_ip_tags, write_text_specs, application_run_time_folder, queue=None):
+            reverse_ip_tags, write_text_specs, application_run_time_folder, queue=None, give_placement=False):
         """ Generates the data specification of an application
 
         :param subvertex: the subvertex to generate data for

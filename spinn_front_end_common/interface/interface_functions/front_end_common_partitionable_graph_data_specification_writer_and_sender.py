@@ -42,6 +42,7 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
 
         :return:
         """
+        involved_place=dict()
 
         # iterate though subvertices and call generate_data_spec for each
         # vertex
@@ -52,17 +53,22 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
                 placement.subvertex)
             if isinstance(associated_vertex, AbstractDataSpecableVertex):
                 core_subset.add_processor(placement.x, placement.y, placement.p)
+                involved_place[placement.x, placement.y, placement.p]=list()
                 number_of_cores_used += 1
 
         from data_specification.sender_pool import SenderPool
-
-        # read DSE exec name
         executable_targets = {
             os.path.dirname(spec_sender.__file__) +
             '/data_specification_executor.aplx': core_subset}
 
         self._load_executable_images(transceiver, executable_targets, 31)
 
+        processors_exited = transceiver.get_core_state_count(31, CPUState.RUNNING)
+        while processors_exited != number_of_cores_used:
+            processors_exited = transceiver.get_core_state_count(31, CPUState.RUNNING)
+            print 'waiting until executables starts'
+            time.sleep(0.2)
+        # read DSE exec name
 
         executable_targets = ExecutableTargets()
         dsg_targets = dict()
@@ -75,8 +81,9 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
         #sp=SenderPool(1, transceiver)
         #queue=sp.get_queue()
         from data_specification.communicator_pool import CommunicatorsPool
-        cp=CommunicatorsPool(1, transceiver)
-
+        from data_specification.communicator_new import CommunicatorSender
+        #cp=CommunicatorsPool(1, transceiver)
+        cp=CommunicatorSender(1, involved_place, transceiver)
         for placement in placements.placements:
             associated_vertex = graph_mapper.get_vertex_from_subvertex(
                 placement.subvertex)
@@ -84,14 +91,14 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
             # if the vertex can generate a DSG, call it
             if isinstance(associated_vertex, AbstractDataSpecableVertex):
 
-                #strkey=str(placement.x)+str(placement.y)+str(placement.p)
+                strkey=str(placement.x)+str(placement.y)+str(placement.p)
                 ip_tags = tags.get_ip_tags_for_vertex(
                     placement.subvertex)
                 reverse_ip_tags = tags.get_reverse_ip_tags_for_vertex(
                     placement.subvertex)
                 try:
-                    #if strkey == "003":
-                    #    pass
+                    if strkey == "0114":
+                        pass
                     if reverse_ip_tags is None:
                         r_iptag=0
                     elif reverse_ip_tags is list:
@@ -101,8 +108,9 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
                         placement.subvertex, placement, partitioned_graph,
                         partitionable_graph, routing_infos, hostname, graph_mapper,
                         report_default_directory, ip_tags, reverse_ip_tags,
-                        write_text_specs, app_data_runtime_folder, queue=new_queue)
+                        write_text_specs, app_data_runtime_folder, queue=new_queue, give_placement=True)
                 except:
+                    #continue
                     cp.emergency_stop()
                     logger.error("Something bad happened during the generation and sending of core x: "+str(placement.x)+" y: "+str(placement.y)+" p:"+str(placement.p) )
                     break
@@ -143,9 +151,7 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
                 31, CPUState.FINISHED)
 
         progress_bar.end()
-
         logger.info("ended spec")
-
         transceiver.stop_application(31)
 
         '''
