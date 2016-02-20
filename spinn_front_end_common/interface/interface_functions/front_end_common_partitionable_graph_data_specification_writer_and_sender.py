@@ -27,6 +27,7 @@ from spinn_front_end_common.utilities import exceptions
 import os
 import time
 import logging
+import traceback
 logger=logging.getLogger(__name__)
 
 class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
@@ -42,8 +43,8 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
 
         :return:
         """
+        placement_per_chip=dict()
         involved_place=dict()
-
         # iterate though subvertices and call generate_data_spec for each
         # vertex
         number_of_cores_used = 0
@@ -53,7 +54,10 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
                 placement.subvertex)
             if isinstance(associated_vertex, AbstractDataSpecableVertex):
                 core_subset.add_processor(placement.x, placement.y, placement.p)
-                involved_place[placement.x, placement.y, placement.p]=list()
+                #involved_place[placement.x, placement.y, placement.p]=list()
+                if (placement.x, placement.y) not in placement_per_chip.keys():
+                    placement_per_chip[(placement.x, placement.y)]=list()
+                placement_per_chip[(placement.x, placement.y)].append((placement.x, placement.y, placement.p))
                 number_of_cores_used += 1
 
         from data_specification.sender_pool import SenderPool
@@ -83,7 +87,8 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
         from data_specification.communicator_pool import CommunicatorsPool
         from data_specification.communicator_new import CommunicatorSender
         #cp=CommunicatorsPool(1, transceiver)
-        cp=CommunicatorSender(1, involved_place, transceiver)
+        #cp=CommunicatorSender(1, involved_place, transceiver)
+        cp = CommunicatorSender(1, placement_per_chip, transceiver)
         for placement in placements.placements:
             associated_vertex = graph_mapper.get_vertex_from_subvertex(
                 placement.subvertex)
@@ -109,13 +114,16 @@ class FrontEndCommomPartitionableGraphDataSpecificationWriterAndSender(object):
                         partitionable_graph, routing_infos, hostname, graph_mapper,
                         report_default_directory, ip_tags, reverse_ip_tags,
                         write_text_specs, app_data_runtime_folder, queue=new_queue, give_placement=True)
-                except:
+                except TypeError as tiperror:
                     #continue
                     cp.emergency_stop()
+                    print (str(tiperror.message))
+                    print (str(traceback.format_exc()))
                     logger.error("Something bad happened during the generation and sending of core x: "+str(placement.x)+" y: "+str(placement.y)+" p:"+str(placement.p) )
                     break
 
-                #lst[strkey]=packet_list
+
+                #  lst[strkey]=packet_list
 
                 # link dsg file to subvertex
                 dsg_targets[placement.x, placement.y, placement.p,
