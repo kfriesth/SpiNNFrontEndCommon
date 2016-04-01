@@ -1,159 +1,118 @@
-"""
-reload script for loading onto a amchien wtihout going through the mapper
-"""
-from spinn_front_end_common.interface.buffer_management.buffer_manager import \
-    BufferManager
-from spinn_front_end_common.interface.front_end_common_interface_functions \
-    import FrontEndCommonInterfaceFunctions
-from spinn_front_end_common.utilities.notification_protocol\
-    .notification_protocol import NotificationProtocol
-
-from spinnman.data.file_data_reader import FileDataReader
-
-from pacman.utilities.progress_bar import ProgressBar
+from pacman.operations.pacman_algorithm_executor import PACMANAlgorithmExecutor
+from spinn_front_end_common.utilities import helpful_functions
 
 
 class Reload(object):
     """ Reload functions for reload scripts
     """
 
-    def __init__(self, machine_name, version, reports_states, bmp_details,
-                 down_chips, down_cores, number_of_boards, height, width,
-                 auto_detect_bmp, enable_reinjection, app_id=30):
-        self._spinnaker_interface = \
-            FrontEndCommonInterfaceFunctions(reports_states, None, None)
-        self._spinnaker_interface.setup_interfaces(
-            machine_name, bmp_details, down_chips, down_cores,
-            version, number_of_boards, width, height, False, False,
-            auto_detect_bmp, enable_reinjection)
-        self._app_id = app_id
-        self._reports_states = reports_states
-        self._total_processors = 0
-        self._buffer_manager = None
-        self._notification_protocol = None
+    def __init__(
+            self,
 
-    def reload_application_data(self, reload_application_data_items,
-                                load_data=True):
-        """
+            # Machine information
+            machine_name, version, bmp_details, down_chips, down_cores,
+            number_of_boards, height, width, auto_detect_bmp,
+            enable_reinjection, scamp_connection_data, boot_port_num,
+            reset_machine_on_start_up, max_sdram_per_chip,
 
-        :param reload_application_data_items:  the application data for each
-        core which needs data to be reloaded to work
-        :param load_data: a boolean which will not reload if set to false.
-        :return: None
-        """
+            # Load data information
+            router_tables, iptags, reverse_iptags, app_data_runtime_folder,
+            dsg_targets, exec_dse_on_host, dse_app_id,
 
-        progress = ProgressBar(len(reload_application_data_items),
-                               "Reloading Application Data")
-        # fixme need to find a way to remove these private accesses (maybe
-        # when the dsg in partitioned it will clear up)
+            # Buffer information
+            buffered_tags, buffered_placements,
 
-        for reload_application_data in reload_application_data_items:
-            if load_data:
-                data_file = FileDataReader(reload_application_data.data_file)
-                self._spinnaker_interface._txrx.write_memory(
-                    reload_application_data.chip_x,
-                    reload_application_data.chip_y,
-                    reload_application_data.base_address, data_file,
-                    reload_application_data.data_size)
-                data_file.close()
-            user_0_register_address = self._spinnaker_interface._txrx.\
-                get_user_0_register_address_from_core(
-                    reload_application_data.chip_x,
-                    reload_application_data.chip_y,
-                    reload_application_data.processor_id)
-            self._spinnaker_interface._txrx.write_memory(
-                reload_application_data.chip_x, reload_application_data.chip_y,
-                user_0_register_address, reload_application_data.base_address)
-            progress.update()
-            self._total_processors += 1
-        progress.end()
+            # Database notification information
+            wait_for_read_confirmation, database_socket_addresses,
+            database_file_path, send_start_notification,
 
-    def reload_routes(self, routing_tables, app_id=30):
-        """
-        reloads a set of routing tables
-        :param routing_tables: the routing tables which need to be reloaded
-        for the application to run successfully
-        :param app_id: the id used to distinquish this for other applications
-        :return: None
-        """
-        self._spinnaker_interface.load_routing_tables(routing_tables, app_id)
+            # Execute information
+            executable_targets, app_id, runtime, time_scale_factor,
+            total_machine_timesteps, time_threshold,
 
-    def reload_binaries(self, executable_targets, app_id=30):
-        """
+            # Flags that indicate what to actually do
+            loading=True, running=True):
 
-        :param executable_targets:the executable targets which needs to
-        be loaded onto the machine
-        :param app_id: the id used to distinquish this for other applications
-        :return: None
-        """
-        self._spinnaker_interface.load_executable_images(executable_targets,
-                                                         app_id)
+        if machine_name == "None":
+            raise Exception(
+                "This reload script was created using a virtual board.  To"
+                " use it, please set machine_name to the hostname or IP"
+                " address of a real board")
 
-    def reload_tags(self, iptags, reverse_iptags):
-        """
-        reloads the tags required to get the simualtion exeucting
-        :param iptags: the iptags from the preivous run
-        :param reverse_iptags: the reverse iptags from the preivous run
-        :return:
-        """
-        self._spinnaker_interface.load_iptags(iptags)
-        self._spinnaker_interface.load_reverse_iptags(reverse_iptags)
+        if scamp_connection_data == "None":
+            scamp_connection_data = None
 
-    def restart(self, executable_targets, runtime, time_scaling,
-                turn_off_machine=True, app_id=30):
-        """
-        :param executable_targets: the executable targets which needs to
-        be loaded onto the machine
-        :param runtime: the amount of time this application is expected to run
-        for
-        :param time_scaling: the time scale factor for timing purposes
-        :param app_id: the id used to distinquish this for other applications
-        :return: None
-        """
-        self._buffer_manager.load_initial_buffers()
-        self._spinnaker_interface.\
-            wait_for_cores_to_be_ready(executable_targets, app_id)
-        self._execute_start_messages()
-        self._spinnaker_interface.start_all_cores(executable_targets, app_id)
-        self._spinnaker_interface.wait_for_execution_to_complete(
-            executable_targets, app_id, runtime, time_scaling)
-        if turn_off_machine:
-            self._spinnaker_interface._txrx.power_off_machine()
+        inputs = dict()
 
-    def enable_buffer_manager(self, buffered_placements, buffered_tags):
-        """
-        enables the buffer manager with the placements and buffered tags
-        :param buffered_placements: the placements which contain buffered\
-                    vertices
-        :param buffered_tags: the tags which contain buffered vertices
-        :return:
-        """
-        self._buffer_manager = BufferManager(
-            buffered_placements, buffered_tags,
-            self._spinnaker_interface._txrx,
-            self._reports_states, None, None)
-        for placement in buffered_placements.placements:
-            self._buffer_manager.add_sender_vertex(placement.subvertex)
+        # Machine inputs
+        inputs['IPAddress'] = machine_name
+        inputs["BoardVersion"] = version
+        inputs["BMPDetails"] = bmp_details
+        inputs["DownedChipsDetails"] = down_chips
+        inputs["DownedCoresDetails"] = down_cores
+        inputs["NumberOfBoards"] = number_of_boards
+        inputs["MachineWidth"] = width
+        inputs["MachineHeight"] = height
+        inputs["AutoDetectBMPFlag"] = auto_detect_bmp
+        inputs["EnableReinjectionFlag"] = enable_reinjection
+        inputs["ScampConnectionData"] = scamp_connection_data
+        inputs["BootPortNum"] = boot_port_num
+        inputs["ResetMachineOnStartupFlag"] = reset_machine_on_start_up
+        inputs["MaxSDRAMSize"] = max_sdram_per_chip
 
-    def execute_notification_protocol_read_messages(
-            self, socket_addresses, wait_for_confirmations, database_path):
-        """
-        writes the interface for sending confirmations for database readers
-        :param socket_addresses: the socket-addresses of the devices which
-        need to read the database
-        :param wait_for_confirmations bool saying if we should wait for
-        confirmations
-        :param database_path the path to the database
-        :return:
-        """
-        self._notification_protocol = NotificationProtocol(
-            socket_addresses, wait_for_confirmations)
-        self._notification_protocol.send_read_notification(database_path)
+        # Loading inputs
+        inputs["MemoryRoutingTables"] = router_tables
+        inputs["MemoryIpTags"] = iptags
+        inputs["MemoryReverseTags"] = reverse_iptags
+        inputs["ApplicationDataFolder"] = app_data_runtime_folder
+        inputs["DataSpecificationTargets"] = dsg_targets
+        inputs["WriteTextSpecsFlag"] = False
+        inputs["WriteMemoryMapReportFlag"] = False
+        inputs["DSEAPPID"] = dse_app_id
 
-    def _execute_start_messages(self):
-        """
-        sends the start messages to the external devices which need them
-        :return:
-        """
-        if self._notification_protocol is not None:
-            self._notification_protocol.send_start_notification()
+        # Buffered inputs
+        inputs["MemoryTags"] = buffered_tags
+        inputs["MemoryPlacements"] = buffered_placements
+        inputs["WriteReloadFilesFlag"] = False
+
+        # Database notification inputs
+        inputs["DatabaseSocketAddresses"] = database_socket_addresses
+        inputs["DatabaseWaitOnConfirmationFlag"] = wait_for_read_confirmation
+        inputs["SendStartNotifications"] = send_start_notification
+        inputs["DatabaseFilePath"] = database_file_path
+
+        # Execute inputs
+        inputs["APPID"] = app_id
+        inputs["NoSyncChanges"] = 0
+        inputs["TimeScaleFactor"] = time_scale_factor
+        inputs["RunTime"] = runtime
+        inputs["TotalMachineTimeSteps"] = total_machine_timesteps
+        inputs["ExecutableTargets"] = executable_targets
+        inputs["PostSimulationOverrunBeforeError"] = time_threshold
+
+        algorithms = list()
+        algorithms.append("FrontEndCommonMachineInterfacer")
+        algorithms.append("MallocBasedChipIDAllocator")
+
+        if loading:
+            algorithms.append("FrontEndCommonRoutingTableLoader")
+            algorithms.append("FrontEndCommonTagsLoaderSeperateLists")
+            if exec_dse_on_host:
+                algorithms.append(
+                    "FrontEndCommonPartitionableGraphHostExecuteDataSpecification")  # @IgnorePep8
+            else:
+                algorithms.append(
+                    "FrontEndCommonPartitionableGraphMachineExecuteDataSpecification")  # @IgnorePep8
+
+        if running:
+            algorithms.append("FrontEndCommonBufferManagerCreater")
+            algorithms.append("FrontEndCommonLoadExecutableImages")
+            algorithms.append("FrontEndCommonNotificationProtocol")
+            algorithms.append("FrontEndCommonRuntimeUpdater")
+            algorithms.append("FrontEndCommonApplicationRunner")
+
+        # run the pacman executor
+        xml_paths = helpful_functions.get_front_end_common_pacman_xml_paths()
+        executer = PACMANAlgorithmExecutor(
+            algorithms, [], inputs, xml_paths, [], False, False)
+        executer.execute_mapping()
