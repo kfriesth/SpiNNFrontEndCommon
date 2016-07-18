@@ -527,9 +527,16 @@ class SpinnakerMainInterface(object):
                 "Machine", "reset_machine_on_startup")
             inputs["MaxCoreId"] = self._read_config_int(
                 "Machine", "core_limit")
+            inputs["LinkInternalFPGATogetherFlag"] = self._config.getboolean(
+                "Machine", "link_internal_fpga_together")
+            inputs["LinkExternalFPGATogetherFlag"] = self._config.getboolean(
+                "Machine", "link_external_fpga_together")
 
             algorithms.append("FrontEndCommonMachineGenerator")
             algorithms.append("MallocBasedChipIDAllocator")
+
+            if self._config.getboolean("Machine", "add_fpgas"):
+                algorithms.insert(0, "FPGA_alloctor")
 
             outputs.append("MemoryExtendedMachine")
             outputs.append("MemoryTransceiver")
