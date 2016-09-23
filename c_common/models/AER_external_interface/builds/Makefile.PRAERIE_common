@@ -1,0 +1,16 @@
+PRAERIE_SOURCE_DIR = $(SOURCE_DIR)/AER_external_interface/
+SOURCES += $(PRAERIE_SOURCE_DIR)PRAERIE_processor.c $(PRAERIE_SOURCE_DIR)Timer.c $(PRAERIE_SOURCE_DIR)Command_processor.c $(PRAERIE_SOURCE_DIR)PRAERIE_codec.c $(PRAERIE_SOURCE_DIR)byte_manip.c
+
+INCLUDES += $(PRAERIE_SOURCE_DIR)PRAERIE-consts.h $(PRAERIE_SOURCE_DIR)PRAERIE-proc-typedefs.h
+
+LIBRARIES += -lPRAERIE_interface
+
+$(BUILD_DIR)$(PRAERIE_SOURCE_DIR)PRAERIE_processor.o : TARGET_INCLUDES = $(PRAERIE_SOURCE_DIR)Command_processor.h $(PRAERIE_SOURCE_DIR)Timer.h
+$(BUILD_DIR)$(PRAERIE_SOURCE_DIR)Timer.o : TARGET_INCLUDES = $(PRAERIE_SOURCE_DIR)Command_processor.h
+$(BUILD_DIR)$(PRAERIE_SOURCE_DIR)Command_processor.o : TARGET_INCLUDES = Timer.h 
+
+$(BUILD_DIR)%.o: $(SOURCES)%.c $(SOURCES)%.h $(INCLUDES) $(TARGET_INCLUDES)
+	-mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -D__FILE__=\"$(notdir $*.c)\" -o $@ $<  
+
+include ../../../Makefile.common

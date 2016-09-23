@@ -1,4 +1,4 @@
-INSTALL_DIRS = front_end_common_lib
+INSTALL_DIRS = front_end_common_lib PRAERIE_lib
 BUILD_DIRS = models
 
 all: install build
