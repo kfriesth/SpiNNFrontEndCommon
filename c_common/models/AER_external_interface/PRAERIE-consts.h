@@ -109,7 +109,7 @@
 
 // constants for buffer setup
 #define NUM_SDRAM_BLOCKS 1024 // number of buffers in SDRAM. 1024 gives ~3MB.
-#define SPIKE_BUF_MAX_SPIKES 255 // size of the spike buffers for incoming spikes
+#define SPIKE_BUF_MAX_SPIKES 256 // size of the spike buffers for incoming spikes
 #define NUM_OUTGOING_PRAERIE_TYPES 8 // number of entries in the MC-AER CAM table
 #define N_INCOMING_SPIKES 256 // number of spaces in the incoming MC spike buffer
 #define MC_MATCH_END 0xFFFFFFFF // with mask 0 indicates no more MC lookup entries

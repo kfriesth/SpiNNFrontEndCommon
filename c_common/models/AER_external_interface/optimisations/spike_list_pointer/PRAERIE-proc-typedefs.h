@@ -179,8 +179,7 @@ typedef struct cmd_IF_state_t {
     timer_t buf_req_interval; // timing interval between requests
     timer_t buf_req_timer; // countdown timer for buffer requests
     pause_state_t interface_paused;
-    uint32_t sdram_space_n;
-    uint32_t sdram_space_p;
+    uint32_t sdram_space[2]; // number of SDRAM blocks (no payload/payload)
     uint32_t sdram_min_req_space;
     uint32_t default_tag; // SDP tag to use by default for outbound messages
     timer_t ticks; // number of timer ticks to run before pausing

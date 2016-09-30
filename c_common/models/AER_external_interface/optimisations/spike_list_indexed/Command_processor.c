@@ -244,7 +244,7 @@ bool sdram_buffer_request(sdp_msg_buf_t* sdp_msg, uint8_t with_payload)
      // space available computations had been multiplied by sizeof(spike_ll_t) but
      // with new definition of a spike_ll_t this should be unnecessary (Verify!)
      if ((sdram_w_buf[with_payload] < sdram_r_buf[with_payload]) || !sdram_has_buffers[with_payload])
-        req_data->space_available = ((sdram_w_buf[with_payload] + SPIKE_BUF_MAX_SPIKES*NUM_SDRAM_BLOCKS) - sdram_r_buf[with_payload]);
+        req_data->space_available = ((sdram_w_buf[with_payload] + cmd_state.sdram_space[with_payload]) - sdram_r_buf[with_payload]);
      else req_data->space_available = (sdram_w_buf[with_payload] - sdram_r_buf[with_payload]);
      if (sdp_msg->mailbox == NULL)
      {   
@@ -289,8 +289,8 @@ void CMD_if_init(uint32_t* sys_config, uint8_t* seq_tags)
      cmd_state.interface_paused = STATE_RUN;
 #ifdef RECEIVER
      cmd_state.buffer_req_en = sys_config[BUFFER_REQ_EN];
-     cmd_state.sdram_space_p = sys_config[WITH_PAYLOAD_BLOCKS]*SPIKE_BUF_MAX_SPIKES*sizeof(spike_ll_t);
-     cmd_state.sdram_space_n = sys_config[NO_PAYLOAD_BLOCKS]*SPIKE_BUF_MAX_SPIKES*sizeof(spike_ll_t);
+     cmd_state.sdram_space[WITH_PAYLOAD] = sys_config[WITH_PAYLOAD_BLOCKS]*SPIKE_BUF_MAX_SPIKES;
+     cmd_state.sdram_space[NO_PAYLOAD] = sys_config[NO_PAYLOAD_BLOCKS]*SPIKE_BUF_MAX_SPIKES;
      cmd_state.sdram_min_req_space = sys_config[SDRAM_MIN_REQ_BLOCKS]*SPIKE_BUF_MAX_SPIKES*sizeof(spike_ll_t);
 #endif
      cmd_state.default_tag = sys_config[DEFAULT_TAG];
