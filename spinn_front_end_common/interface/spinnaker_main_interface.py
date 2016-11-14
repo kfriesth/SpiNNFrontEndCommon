@@ -25,6 +25,8 @@ from spinn_front_end_common.interface.provenance.pacman_provenance_extractor \
 from spinn_front_end_common.abstract_models\
     .abstract_binary_uses_simulation_run import AbstractBinaryUsesSimulationRun
 
+from spinnman.model.cpu_state import CPUState
+
 # general imports
 from collections import defaultdict
 import logging
@@ -1278,17 +1280,24 @@ class SpinnakerMainInterface(object):
         has_failed_to_end = isinstance(
             e, common_exceptions.ExecutableFailedToStopException)
 
+        executable_targets = error_outputs["ExecutableTargets"]
+        error_cores = helpful_functions.get_cores_in_state(
+            executable_targets.all_core_subsets,
+            {CPUState.RUN_TIME_EXCEPTION, CPUState.WATCHDOG}, error_outputs["MemoryTransceiver"])
+        logger.error(helpful_functions.get_core_status_string(error_cores))
+
+        algorithms = list()
+        outputs = list()
+        inputs = dict(error_outputs)
+
         # If we have failed to start or end, get some extra data
         if has_failed_to_start or has_failed_to_end:
             is_rte = True
             if has_failed_to_end:
                 is_rte = e.is_rte
 
-            inputs = dict(error_outputs)
             inputs["FailedCoresSubsets"] = e.failed_core_subsets
             inputs["RanToken"] = True
-            algorithms = list()
-            outputs = list()
 
             # If there is not an RTE, ask the chips with an error to update
             # and get the provenance data
@@ -1296,32 +1305,32 @@ class SpinnakerMainInterface(object):
                 algorithms.append("FrontEndCommonChipProvenanceUpdater")
                 algorithms.append("FrontEndCommonPlacementsProvenanceGatherer")
 
-            # Get the other data
-            algorithms.append("FrontEndCommonIOBufExtractor")
-            algorithms.append("FrontEndCommonRouterProvenanceGatherer")
+        # Get the other data
+        algorithms.append("FrontEndCommonIOBufExtractor")
+        algorithms.append("FrontEndCommonRouterProvenanceGatherer")
 
-            # define outputs for the execution
-            outputs.append("ProvenanceItems")
-            outputs.append("IOBuffers")
-            outputs.append("ErrorMessages")
-            outputs.append("WarnMessages")
+        # define outputs for the execution
+        outputs.append("ProvenanceItems")
+        outputs.append("IOBuffers")
+        outputs.append("ErrorMessages")
+        outputs.append("WarnMessages")
 
-            executor = PACMANAlgorithmExecutor(
-                algorithms=algorithms, optional_algorithms=[], inputs=inputs,
-                xml_paths=self._xml_paths, required_outputs=outputs,
-                do_timings=self._do_timings, print_timings=self._print_timings)
-            executor.execute_mapping()
+        executor = PACMANAlgorithmExecutor(
+            algorithms=algorithms, optional_algorithms=[], inputs=inputs,
+            xml_paths=self._xml_paths, required_outputs=outputs,
+            do_timings=self._do_timings, print_timings=self._print_timings)
+        executor.execute_mapping()
 
-            self._write_provenance(executor.get_items())
-            self._check_provenance(executor.get_item("ProvenanceItems"))
-            self._write_iobuf(executor.get_item("IOBuffers"))
-            self._print_iobuf(
-                executor.get_item("ErrorMessages"),
-                executor.get_item("WarnMessages"))
-            self.stop(turn_off_machine=False, clear_routing_tables=False,
-                      clear_tags=False, extract_provenance_data=False,
-                      extract_iobuf=False)
-            sys.exit(1)
+        self._write_provenance(executor.get_items())
+        self._check_provenance(executor.get_item("ProvenanceItems"))
+        self._write_iobuf(executor.get_item("IOBuffers"))
+        self._print_iobuf(
+            executor.get_item("ErrorMessages"),
+            executor.get_item("WarnMessages"))
+        self.stop(turn_off_machine=False, clear_routing_tables=False,
+                  clear_tags=False, extract_provenance_data=False,
+                  extract_iobuf=False)
+        sys.exit(1)
 
     def _extract_iobuf(self):
         if (self._config.getboolean("Reports", "extract_iobuf") and
