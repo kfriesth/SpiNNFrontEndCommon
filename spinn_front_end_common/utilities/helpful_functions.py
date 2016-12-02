@@ -309,9 +309,26 @@ def get_core_status_string(core_infos):
     break_down = "\n"
     for ((x, y, p), core_info) in core_infos.iteritems():
         if core_info.state == CPUState.RUN_TIME_EXCEPTION:
-            break_down += "    {}:{}:{} in state {}:{}\n".format(
-                x, y, p, core_info.state.name,
-                core_info.run_time_error.name)
+            break_down += \
+                "    {}:{}:{} in state {}:{}\n" \
+                "        "\
+                "processor_state_register: 0x{:08x}\n" \
+                "        "\
+                "stack_pointer:            0x{:08x}\n"\
+                "        "\
+                "link_register:            0x{:08x}\n".format(
+                    x, y, p, core_info.state.name,
+                    core_info.run_time_error.name,
+                    core_info.processor_state_register,
+                    core_info.stack_pointer, core_info.link_register)
+
+            # print out registers for more debug purposes
+            registers = core_info.registers
+            for register_index in range(0, len(registers)):
+                break_down += \
+                    "        Register {} : 0x{:08x}\n".format(
+                        register_index, registers[register_index])
+
         else:
             break_down += "    {}:{}:{} in state {}\n".format(
                 x, y, p, core_info.state.name)
